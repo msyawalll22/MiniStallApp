@@ -1,2 +1,5 @@
 .env 
-node_modules 
+.env.example 
+vendor/ 
+node_modules/ 
+*.log 

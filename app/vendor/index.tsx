@@ -35,7 +35,6 @@ function AnnouncementBanner() {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    // Listens to the global settings document we created
     return onSnapshot(doc(db, "settings", "announcement"), (snap) => {
       if (snap.exists() && snap.data().active) {
         setData(snap.data());
@@ -150,7 +149,7 @@ const CheckoutSection = memo(({
     <ScrollView 
         style={{ flex: 1 }} 
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
     >
         {cart.map((item: any) => (
         <View key={item.id} style={styles.cartItem}>
@@ -263,7 +262,27 @@ export default function POSSystem() {
       if (u) {
         const unsubVendor = onSnapshot(doc(db, "users", u.uid), (snap) => {
           if (snap.exists()) {
-            setVendorData(snap.data());
+            const data = snap.data();
+            setVendorData(data);
+
+            const isCurrentFreeze = pathname.includes('freeze');
+            const isCurrentSubs = pathname.includes('subscription');
+
+            // 1. Detect Freeze
+            if (data.status === 'freeze' && !isCurrentFreeze) {
+              router.replace('/vendor/freeze' as any);
+              return;
+            }
+
+            // 2. Detect Expiry/Not Approved
+            const hasExpiry = data?.expiryDate != null;
+            const isExpired = hasExpiry && data.expiryDate.toDate() < new Date();
+            const isNotApproved = data?.isApproved === false;
+
+            if ((isNotApproved || isExpired) && !isCurrentSubs && !isCurrentFreeze) {
+              router.replace('/vendor/subscription' as any);
+              return;
+            }
           }
           setLoading(false);
         }, (error) => {
@@ -276,7 +295,7 @@ export default function POSSystem() {
       }
     });
     return () => unsubAuth();
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (!user) return;
@@ -445,30 +464,34 @@ export default function POSSystem() {
     return <View style={styles.loadingBox}><ActivityIndicator size="large" color="#6366F1" /></View>;
   }
 
+  // UI Logic for Overlay
   const isApproved = vendorData?.isApproved === true;
   const hasExpiry = vendorData?.expiryDate != null;
   const isExpired = hasExpiry && vendorData.expiryDate.toDate() < new Date();
-  const isOnSubscriptionPage = pathname.includes('subscription');
-  const shouldShowLock = (!isApproved || isExpired) && !isOnSubscriptionPage;
+  const isFrozen = vendorData?.status === 'freeze';
+  const shouldShowLock = (isFrozen || !isApproved || isExpired) && !pathname.includes('subscription') && !pathname.includes('freeze');
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      
-      {shouldShowLock && (
+  // If locked, return the Lock screen only (No navigation or sidebars)
+  if (shouldShowLock) {
+    return (
+      <SafeAreaView style={styles.container}>
         <SubscriptionLock 
             vendorData={vendorData} 
             theme={theme} 
             isSubscriptionPage={false} 
         />
-      )}
+      </SafeAreaView>
+    );
+  }
 
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      
       <View style={isTablet ? styles.tabletLayout : { flex: 1 }}>
         <View style={{ flex: isTablet ? 1.6 : 1 }}>
           <View style={styles.header}>
-            {/* Added Announcement Banner Here */}
             <AnnouncementBanner />
-            
             <View style={styles.searchBar}>
               <Ionicons name="search" size={18} color="#94A3B8" />
               <TextInput placeholder="Search menu..." style={styles.searchInput} value={searchQuery} onChangeText={setSearchQuery} placeholderTextColor="#94A3B8"/>
@@ -510,7 +533,11 @@ export default function POSSystem() {
       {!isTablet && (
         <Modal visible={viewState === 'CHECKOUT'} animationType="slide" transparent={true} onRequestClose={() => setViewState('MENU')}>
           <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+                style={{ flex: 1, justifyContent: 'flex-end' }}
+                enabled
+            >
                 <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { Keyboard.dismiss(); setViewState('MENU'); }} />
                 <View style={styles.halfModalContainer}>
                   <View style={styles.modalHandle} />
@@ -526,7 +553,7 @@ export default function POSSystem() {
         </Modal>
       )}
 
-      <Modal visible={viewState === 'RECEIPT'} animationType="slide" transparent={false}>
+      <Modal visible={viewState === 'RECEIPT'} animationType="fade" transparent={false}>
           <View style={styles.receiptOverlay}>
               <SafeAreaView style={styles.receiptContent}>
                   <View style={styles.receiptCard}>
@@ -574,11 +601,8 @@ const styles = StyleSheet.create({
   tabletLayout: { flex: 1, flexDirection: 'row' },
   tabletRightSide: { width: 380, backgroundColor: '#FFF', borderLeftWidth: 1, borderLeftColor: '#E2E8F0' },
   header: { backgroundColor: '#FFF', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 10, paddingTop: Platform.OS === 'android' ? 40 : 20 },
-  
-  // Announcement Styles
   banner: { flexDirection: 'row', padding: 12, borderRadius: 12, alignItems: 'center', gap: 10, marginBottom: 10, elevation: 1 },
   bannerText: { fontWeight: '700', fontSize: 13, flex: 1 },
-
   searchBar: { flexDirection: 'row', backgroundColor: '#F1F5F9', padding: 12, borderRadius: 15, alignItems: 'center' },
   searchInput: { marginLeft: 10, flex: 1, fontSize: 16, color: '#000' },
   categoryScroll: { flexDirection: 'row', marginTop: 10 },
@@ -598,7 +622,7 @@ const styles = StyleSheet.create({
   cartBadge: { backgroundColor: '#6366F1', width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   badgeText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
   cartText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   halfModalContainer: { height: '85%', backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden', elevation: 20 },
   modalHandle: { width: 40, height: 4, backgroundColor: '#E2E8F0', borderRadius: 10, alignSelf: 'center', marginTop: 10, marginBottom: 5 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center' },

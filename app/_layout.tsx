@@ -16,7 +16,7 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
 
-  const BOSS_UID = 'QnHWLDfCdbfemBTKfHxpoRtQxal1';
+ 
 
   // 1. Font Loading
   useEffect(() => {

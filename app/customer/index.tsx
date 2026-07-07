@@ -18,15 +18,7 @@ import {
 } from 'react-native';
 import { createToyyibBill } from '../../services/ToyyibPayService';
 
-// --- FIREBASE SETUP ---
-const firebaseConfig = {
-  apiKey: "AIzaSyBq7znOq22tDQyHvl8WBfLSPthZw3-30oc",
-  authDomain: "ministall-app.firebaseapp.com",
-  projectId: "ministall-app",
-  storageBucket: "ministall-app.firebasestorage.app",
-  messagingSenderId: "997346919313",
-  appId: "1:997346919313:web:6a9d0c930fd95bb0101030"
-};
+
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
