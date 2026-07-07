@@ -5,3 +5,6 @@ node_modules/
 *.log 
 dist/ 
 .firebase/ 
+"path/to/your/service-account.json" 
+google-services.json 
+google-services.json 
